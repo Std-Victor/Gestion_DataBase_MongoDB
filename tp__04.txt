@@ -1,0 +1,93 @@
+use test
+
+// question__01
+db.world.find().count()
+db.world.aggregate([{ $count:"Name"}])
+
+// question__02
+db.world.distinct("Continent")
+db.world.aggregate([{$group:{_id:"$Continent"}}])
+
+db.world.aggregate([
+    {$group:{_id:"$Continent"}},
+    {$group:{_id:null, Continent:{$push:"$_id"}}},
+    {$project:{Continent:1,_id:0, count:{$size:"$Continent"}}}
+])
+db.runCommand({distinct:"world", key:"Continent"})
+
+// question__03
+db.world.find({Name:"Angola"})
+
+// question__04
+db.world.find({Continent:"Europe", Population:{$lt:100000}})
+
+// question__05
+db.world.find({Continent:"Asia",IndepYear:{$exists:true}})
+
+// question__06
+db.world.find().sort({SurfaceArea:-1}).limit(1)
+db.world.aggregate([{$sort:{SurfaceArea:-1}}, {$limit:1}])
+
+// question__07
+db.world.aggregate([
+    {$group:{_id:{continent:"$Continent", indepYear:"$IndepYear"}, nbr_pays:{$sum:1}, total_population:{$sum:"$Population"}}},
+    {$group:{_id:"$_id.continent", nbr_pays:{$sum:"$nbr_pays"}, total_population:{$sum:"$total_population"}, IndepYear:{$push:"$_id.indepYear"}}},
+    {$project:{_id:0, Continent:"$_id",nbr_pays:1, total_population:1, nbr_indep_pays:{$size:"$IndepYear"}},}
+])
+
+// question__08
+db.world.find({Name:"Angola"}, {Population:1,_id:0})
+
+// question__09
+db.world.aggregate([
+    {$unwind:"$Cities"},
+    {$match:{Name:"Angola", "Cities.Capital":true}},
+    {$project:{"Cities.Name":1, _id:0, "Cities.Population":1}}
+])
+
+// question__10
+db.world.aggregate([
+    {$unwind:"$Languages"},
+    {$group:{_id:"$Languages.Language", count:{$sum:1}}},
+    {$match:{count:{$gte:2}}},
+    {$project:{language:"$_id", _id:0, count:1}},
+    {$sort:{count:-1}}
+])
+
+// question__11
+db.world.aggregate([
+    {$project:{Name:1, nbr_cities:{$size:"$Cities"}, _id:0}},
+    {$match:{nbr_cities:{$gt:1}}},
+    {$sort:{nbr_cities:-1}}
+])
+
+// question__12
+db.world.aggregate([
+    {$unwind:"$Cities"},
+    {$sort:{"Cities.Population":-1}},
+    {$limit:10},
+    {$project:{Name:1, citie_name:"$Cities.Name", _id:0, population:"$Cities.Population"}}
+])
+
+// question__13
+db.world.find({Languages:{$elemMatch:{Language:"Dutch", IsOfficial:true}}}, {Name:1, _id:0})
+db.world.aggregate([
+    {$match:{"Languages.Language": "Dutch", "Languages.IsOfficial": true}},
+    {$project:{Name:1, _id:0}}
+])
+
+// question__14
+db.world.aggregate([
+    {$project:{Name:1, _id:0, nbr_language:{$size:"$Languages"}}},
+    {$sort:{nbr_language:-1}},
+    {$limit:5}
+])
+
+// question__15
+db.world.aggregate([
+    {$unwind:"$Cities"},
+    {$group:{_id: {pays:"$Name", population:"$Population"}, real_population:{$sum:"$Cities.Population"}}},
+    {$match:{$expr: {$gt:["$real_population", "$_id.population"]}}},
+    {$project:{_id:0, pays:"$_id.pays", real_pulation:"$real_population", fake_population: "$_id.population"}}
+])
+

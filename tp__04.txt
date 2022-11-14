@@ -35,6 +35,11 @@ db.world.aggregate([
     {$project:{_id:0, Continent:"$_id",nbr_pays:1, total_population:1, nbr_indep_pays:{$size:"$IndepYear"}},}
 ])
 
+db.world.aggregate([
+    {$group:{_id:"$Continent", nbr_pays:{$sum:1}, total_population:{$sum:"$Population"}, IndepYear:{$push:"$IndepYear"}}},
+    {$project:{_id:0, Continent:"$_id",nbr_pays:1, total_population:1, nbr_indep_pays:{$size:"$IndepYear"}}}
+])
+
 // question__08
 db.world.find({Name:"Angola"}, {Population:1,_id:0})
 

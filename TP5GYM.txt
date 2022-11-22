@@ -1,0 +1,202 @@
+// question___(A)
+db.Sportifs.find(
+    {Age:{$gte:20,$lt:30}},
+    {_id:0, IdSportif:1, Nom:1, Prenom:1, Age:1}
+)
+
+// question___(B)
+db.Gymnases.find(
+    {Ville:{$in:["VILLETANEUSE", "SARCELLES"]}, Surface:{$gt:400}},
+    {_id:0, NomGymnase:1, Ville:1, Surface:1}
+)
+
+// question___(C)
+db.Sportifs.find(
+    {"Sports.Jouer": "Hand ball"},
+    {_id:0, IdSportif:1, Nom:1, Prenom:1}
+)
+
+// question___(D)
+db.Gymnases.find(
+    {"Seances.Libelle" : "Hand ball"},
+    {_id:0, NomGymnase:1, "Seances.Jour":1}
+)
+db.Gymnases.aggregate([
+    { $unwind : "$Seances" },
+    { $match: { "Seances.Libelle" : "Hand ball" }},
+    { $group: {
+        "_id": { 
+            "Nom": "$NomGymnase", 
+            "Ville": "$Ville", 
+            "Jour": { $toLower: "$Seances.Jour"} 
+        },
+        "nbr_seances": { $sum: 1 }
+    }},
+    { $sort: {
+        "_id.Ville": 1,
+        "_id.Nom": 1,
+        "nbr_seances": -1
+    }}
+])
+
+// question___(E)
+db.Gymnases.find( 
+    {"Seances.Libelle": "Hockey", "Seances.Jour": {$in: ["mercredi", "Mercredi"]}, "Seances.Horaire" : {$gt:15}},
+    {_id:0, IdGymnase:0, Surface:0}
+)
+db.Gymnases.aggregate([
+    {$unwind:"$Seances"},
+    {$match:{"Seances.Libelle" : "Hockey","Seances.Jour": { "$in": [ "mercredi", "Mercredi" ]}, "Seances.Horaire":{$gte:15}}},
+    { $project: {
+        "_id": 0,
+        "Gymnase" : "$NomGymnase", 
+        "Ville" : "$Ville"
+    }},
+    { $sort: {
+        "Ville": 1,
+        "Gymnase": 1
+    }}
+])
+
+// question___(F)
+db.Sportifs.find(
+    {"Sports.Jouer":{$exists: false}},
+    {_id:0, Nom:1, Prenom:1}
+)
+
+// question___(G)
+db.Gymnases.find(
+    {"Seances.Jour":{$nin:["dimanche","Dimanche"]}},
+    {_id:0, NomGymnase:1, Ville:1, Seances:1}
+)
+
+// question___(H)
+db.Sportifs.find(
+    {$nor:[{"Seances.Libelle":{$ne:"Hand ball"}},{"Seances.Libelle":{$ne:"Basket ball"}}]}, 
+    {_id:0, NomGymnase:1, Ville:1, Seances:1}    
+)
+
+// question___(I)
+db.Sportifs.find(
+    {"Sports.Jouer" :{$exists: true}, "Sports.Entrainer":{$exists: true}},
+     {_id:0, Nom:1, Prenom:1}
+)
+
+// question___(J)
+db.Sportifs.find(
+    {"IdSportif": {$in: db.Sportifs.distinct("IdSportifConseiller")}},
+    {_id:0, Nom:1, Prenom:1}
+)
+
+// question___(K)
+db.Sportifs.find(
+    {"IdSportif": db.Sportifs.findOne({"Nom": "KERVADEC"}).IdSportifConseiller},
+    {_id:0,Sports:0}
+)
+
+// question___(L)
+db.Sportifs.find(
+    {$and : [{"Sports.Entrainer":"Hand ball"}, {"Sports.Entrainer" : "Basket ball"}]} , 
+    {_id:0, Nom:1, Prenom:1, "Sports.Entrainer":1}
+)
+
+// question___(M)
+db.Sportifs.aggregate([
+    {$project: {_id:0, sportif:{$concat: [{$toString: "$IdSportif"}," ","$Nom", " ","$Prenom" ]},Age:1}},
+    {$group:{_id:"$Age", text:{$push: "$sportif"}}}
+])
+db.Sportifs.aggregate([
+    {$group:{_id:"$Age", text:{$push: {IdSportif: "$IdSportif", Nom: "$Nom", Prenom :"$Prenom"}}}}
+])
+
+// question___(N)
+db.Sportifs.aggregate([
+    {$match:{"Sports.Jouer":"Basket ball","Sexe":{$in:["f", "F"]}}},
+    {$group:{_id:null, moyenne_age:{$avg:"$Age"}}}
+])
+
+// question___(O)
+db.Sportifs.find( 
+    {"Age": db.Sportifs.find().sort({"Age":1}).limit(1).next().Age},
+    {_id:0,Sports:0}
+)
+
+// question___(P)
+db.Gymnases.find({
+    "Ville": {$in:["STAINS", "MONTMORENCY"]}, 
+    "Surface" : db.Gymnases.find({"Ville": {$in:["STAINS", "MONTMORENCY"]}}).sort({"Surface":-1}).limit(1).next().Surface
+})
+db.Gymnases.find({
+    "Ville": {$in:["STAINS", "MONTMORENCY"]}, 
+    "Surface" : {$in:[
+        db.Gymnases.find({"Ville": "STAINS"}).sort({"Surface":-1}).limit(1).next().Surface, 
+        db.Gymnases.find({"Ville": "MONTMORENCY"}).sort({"Surface":-1}).limit(1).next().Surface
+        ]}
+}).sort({"Ville":1})
+
+// question___(Q)
+db.Sportifs.find(
+    {$and : [
+        {$or:[{"Sports.Entrainer": "Hand ball"},{"Sports.Entrainer": "Basket ball"}]},
+        {"Sports.Entrainer":{$nin: db.Sportifs.distinct("Sports.Entrainer").filter(item => !["Hand ball", "Basket ball"].includes(item))}}
+        ]
+    }
+)
+
+// question___(R)
+db.Sportifs.aggregate([
+    {$match: {"Age": {$exists: true}, "IdSportifConseiller":{$exists: true}}},
+    {$group:{_id:{age: "$Age", conseiller: "$IdSportifConseiller"}, text:{$push: {IdSportif: "$IdSportif", Nom: "$Nom", Prenom :"$Prenom"}}}},
+    {$sort: {"_id.age":1, "_id.conseiller":1}}
+])
+
+// question___(S)
+db.Sportifs.find( 
+    {IdSportifConseiller:{$exists: false}},
+    {_id:0, Sports:0}
+)
+
+// question___(T)
+db.Sportifs.aggregate([
+    {$match: {"Sports.Arbitrer": {$exists: true}}},
+    {$project: {_id:0, nbr_sports_arbite:{$cond:[{$isArray: "$Sports.Arbitrer"}, {$size:"$Sports.Arbitrer"}, 1]}, "Sports.Arbitrer":1, Nom:1, Prenom:1, IdSportif:1}}
+])
+
+// question___(U)
+db.Gymnases.aggregate([
+    {$match:{"Ville": "STAINS"}},
+    {$unwind: "$Seances"},
+    {$project: { nom: "$NomGymnase", jour : {$toLower: "$Seances.Jour"}, heure: "$Seances.Horaire"}},
+    {$group: {_id:{nom: "$nom" , jour: "$jour"}, debut: {$min:"$heure"}, fin : {$max: "$heure"}}},
+    {$sort: {"_id.nom":1, "_id.jour":1}}
+])
+
+// question___(V)
+db.Gymnases.aggregate([
+    {$unwind: "$Seances"},
+    {$match: {"Seances.Libelle": "Hand ball"}},
+    {$project : {_id:0, entraineur : "$Seances.IdSportifEntraineur", jour: {$toLower: "$Seances.Jour"} }},
+    {$group: {_id:{entraineur: "$entraineur", jour: "$jour"}, count:{$sum:1}}},
+    {$project: {entraineur: "$_id.entraineur", jour : "$_id.jour", nbr_seances: "$count", _id:0}},
+    {$sort:{entraineur:1, jour:1}}
+])
+db.Gymnases.aggregate([
+    {$unwind : "$Seances"},
+    {$match : {"Seances.IdSportifEntraineur" : {$in : db.Sportifs.find({"Sports.Entrainer" : "Hand ball"}, {_id:0, IdSportif:1}).map(spt => spt.IdSportif)}}},
+    {$project : {_id:0, entraineur : "$Seances.IdSportifEntraineur", jour: {$toLower: "$Seances.Jour"} }},
+    {$group: {_id:{entraineur: "$entraineur", jour: "$jour"}, count:{$sum:1}}},
+    {$sort:{"_id.entraineur":1, "_id.jour":1}}
+])
+
+// question___(W)
+db.Gymnases.aggregate([
+    {$unwind: "$Seances"},
+    {$match: {"Seances.Jour" : {$in : ["mercredi", "Mercredi"]}}},
+    {$group: {_id:"$NomGymnase", count: {$sum:1}}},
+    {$match: {count: {$gte:15}}}
+])
+
+
+
+
+

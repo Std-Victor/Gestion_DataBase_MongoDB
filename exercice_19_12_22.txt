@@ -1,0 +1,253 @@
+create table department(
+    num int primary key auto_increment,
+    libelle varchar(30) not null,
+    chef int not null
+);
+create table employee(
+    num int primary key auto_increment,
+    nom varchar(25) not null,
+    prenom varchar(25) not null,
+    salaire int not null,
+    prime float,
+    num_department int not null,
+    foreign key (num_department) references department (num) on update  cascade  on delete cascade
+);
+create table client(
+    num int primary key auto_increment,
+    nom varchar(25) not null,
+    prenom varchar(25) not null,
+    adresse text not null,
+    num_employee int not null,
+    foreign key (num_employee) references employee(num) on update cascade on delete cascade
+);
+
+--- question__01
+delimiter $$
+drop procedure if exists q1 $$
+create procedure q1(n int)
+begin
+    declare length_employee_table int;
+    select count(*) into length_employee_table from employee;
+    case
+        when n = 0 then
+            select 'entre a valide number';
+        when n > length_employee_table then
+            select 'your number', n, 'is out of our employee range';
+        when n < 0 then
+            select 'entre a valide number greater than zero';
+        else
+            select * from employee join
+                (select distinct emp.salaire from employee emp order by salaire desc limit n)
+                    new_emp on employee.salaire in (new_emp.salaire) order by employee.salaire desc;
+    end case;
+end $$
+
+delimiter;
+call q1(5);
+
+--- question__02
+
+delimiter $$
+drop procedure if exists q2 $$
+create procedure q2()
+begin
+    declare finished_01 int default 0;
+    declare department_num int;
+    declare department_title varchar(30);
+    declare department_chef int;
+    declare dept_cur cursor for select * from department;
+    declare continue handler for not found set finished_01 = 1;
+
+    drop temporary table if exists messages;
+    create temporary table messages
+        select department.num as dept_num, libelle, chef , employee.num as emp_num, nom, prenom, salaire, prime from employee, department
+        where num_department = department.num and department.num=-1;
+    -- create messages table with the datatype needed
+
+    open dept_cur;
+    outer_loop:loop
+        fetch dept_cur into department_num, department_title, department_chef;
+        if finished_01 = 1 then
+            leave outer_loop;
+        end if;
+
+        inner_blok:begin
+            declare finished_02 int default 0;
+            declare p_nom varchar(25);
+            declare p_prenom varchar(25);
+            declare p_salaire int;
+            declare p_prime float;
+            declare p_num int;
+            declare p_department_foreign int;
+            declare emp_cur cursor for select employee.* from employee where num_department = department_num;
+            declare continue handler for not found set finished_02 = 1;
+            open emp_cur;
+            inner_loop:loop
+                fetch emp_cur into p_num, p_nom, p_prenom, p_salaire, p_prime, p_department_foreign;
+                if finished_02 = 1 then
+                    leave inner_loop;
+                end if;
+
+                insert into messages value (department_num, department_title, department_chef, p_num, p_nom,p_prenom, p_salaire, p_prime);
+
+            end loop inner_loop;
+
+            close emp_cur;
+
+        end inner_blok;
+
+    end loop outer_loop;
+    close dept_cur;
+
+
+end $$
+
+call q2();
+select * from messages;
+
+---- question__03
+
+delimiter $$
+drop procedure if exists q3 $$
+create procedure q3()
+begin
+    declare finished int default 0;
+    declare emp_num int;
+    declare emp_salary int;
+    declare emp_cur cursor for select num, salaire from employee;
+    declare continue handler for not found set finished = 1;
+    alter table employee
+        add column stars varchar(100) default '';
+    open emp_cur;
+    loop_block:loop
+        fetch emp_cur into emp_num, emp_salary;
+        if finished = 1 then
+            leave loop_block;
+        end if;
+        update employee set stars = concat(stars, repeat('*', emp_salary div 1000)) where num = emp_num;
+    end loop loop_block;
+    close emp_cur;
+
+end $$
+
+call q3();
+
+select * from employee
+
+---question__04
+
+delimiter $$
+drop procedure if exists q4 $$
+create procedure q4(chef_number int)
+begin
+    select employee.* from employee, department where num_department = department.num and chef = chef_number;
+end $$
+
+delimiter ;
+call q4(8);
+
+---question__05
+
+delimiter $$
+drop procedure if exists q5 $$
+create procedure q5(empt_number int)
+begin
+    declare level int default 1;
+    declare are_subordonne int default 0;
+    declare is_chef boolean default false;
+    declare finished boolean default false;
+    declare p_nom varchar(25);
+    declare p_prenom varchar(25);
+    declare p_salaire int;
+    declare p_prime float;
+    declare p_num int;
+    declare p_department_foreign int;
+    declare p_stars varchar(100);
+    declare empt_cusr cursor for select employee.* from employee, department where num_department = department.num and chef = empt_number;
+    declare continue handler for not found set finished = true;
+    drop temporary table if exists subordonne;
+    create temporary table subordonne select * from employee where num = -1;
+    alter table subordonne
+        add column niveau int first,
+        add column chef int after niveau;
+
+    open empt_cusr;
+    loop_block:loop
+        fetch empt_cusr into p_num, p_nom, p_prenom, p_salaire, p_prime, p_department_foreign, p_stars;
+        if finished then
+            leave loop_block;
+        end if;
+        insert into subordonne value (level, empt_number, p_num, p_nom, p_prenom, p_salaire, p_prime, p_department_foreign, p_stars);
+        select count(employee.num) into are_subordonne from employee, department where num_department = department.num and chef = p_num;
+        if are_subordonne > 0 then
+            set is_chef = true;
+        end if;
+    end loop loop_block;
+    close empt_cusr;
+
+    while is_chef do
+        set is_chef = false;
+        set level = level + 1;
+        outer__block:begin
+            declare finished_01 boolean default false;
+            declare chef_num int;
+            declare nested_chef_cusr cursor for select num from subordonne where niveau = (level-1);
+            declare continue handler for not found set finished_01 = true;
+            open nested_chef_cusr;
+            outer__loop:loop
+                fetch nested_chef_cusr into chef_num;
+                if finished_01 then
+                    leave outer__loop;
+                end if;
+                inner_blok:begin
+                    declare finished_02 boolean default false;
+                    declare p_nom varchar(25);
+                    declare p_prenom varchar(25);
+                    declare p_salaire int;
+                    declare p_prime float;
+                    declare p_num int;
+                    declare p_department_foreign int;
+                    declare p_stars varchar(100);
+                    declare nested_emp_cur cursor for select employee.* from employee, department where num_department = department.num and chef = chef_num;
+                    declare continue handler for not found set finished_02 = true;
+                    open nested_emp_cur;
+                    inner_loop:loop
+                        fetch nested_emp_cur into p_num, p_nom, p_prenom, p_salaire, p_prime, p_department_foreign, p_stars;
+                        if finished_02 = 1 then
+                            leave inner_loop;
+                        end if;
+                        insert into subordonne value (level, chef_num,p_num, p_nom, p_prenom, p_salaire, p_prime, p_department_foreign, p_stars);
+                        select count(employee.num) into are_subordonne from employee, department where num_department = department.num and chef = p_num;
+                        if are_subordonne > 0 then
+                            set is_chef = true;
+                        end if;
+                    end loop inner_loop;
+                    close nested_emp_cur;
+                end inner_blok;
+            end loop outer__loop;
+            close nested_chef_cusr;
+        end outer__block;
+    end while;
+end $$
+
+call q5(20);
+
+select * from subordonn;
+
+---question__06
+delimiter $$
+drop function if exists q6 $$
+create function q6(chef_number int) returns int not deterministic
+begin
+    declare are_subordonne int default 0;
+    select count(employee.num) into are_subordonne from employee, department where num_department = department.num and chef = chef_number;
+    if are_subordonne > 0 then
+        return are_subordonne;
+    end if;
+    return -1;
+
+end $$
+
+delimiter ;
+
+select q6(11);
